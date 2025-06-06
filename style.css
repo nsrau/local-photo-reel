@@ -1,0 +1,297 @@
+:root {
+  --bg-color: #1a1a1a;
+  --surface-color: #2a2a2a;
+  --primary-color: #7e57c2;
+  --text-color: #e0e0e0;
+  --subtle-text-color: #a0a0a0;
+  --border-color: #3a3a3a;
+  --success-color: #4caf50;
+  --error-color: #f44336;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+    Arial, sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  line-height: 1.6;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  padding: 2rem;
+  overflow: hidden; /* Prevents scrollbars from toast container */
+}
+
+.container {
+  width: 100%;
+  max-width: 1200px;
+  height: 90vh;
+  max-height: 800px;
+  background-color: var(--surface-color);
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* --- Header / Actions --- */
+header {
+  padding: 1.5rem 2rem;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+header h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+header #folder-name {
+  font-size: 0.9rem;
+  color: var(--subtle-text-color);
+  margin-top: 4px;
+}
+
+.action-button {
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.2s;
+}
+
+.action-button:hover {
+  background-color: #673ab7;
+  transform: translateY(-2px);
+}
+
+.secondary-button {
+  background-color: var(--surface-color);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+}
+.secondary-button:hover {
+  background-color: #333;
+}
+
+/* --- Main Content / Gallery --- */
+main {
+  flex-grow: 1;
+  overflow-y: auto;
+  padding: 2rem;
+}
+
+#gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 1.5rem;
+}
+
+/* --- Welcome Screen --- */
+#welcome-screen {
+  display: none; /* Hidden by default, shown by JS */
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  text-align: center;
+}
+#welcome-screen h2 {
+  font-size: 2rem;
+  margin-bottom: 1rem;
+}
+#welcome-screen p {
+  color: var(--subtle-text-color);
+  max-width: 400px;
+  margin-bottom: 2rem;
+}
+#welcome-actions {
+  display: flex;
+  gap: 1rem;
+}
+
+/* --- Thumbnail Card --- */
+.thumbnail {
+  background-color: var(--bg-color);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  position: relative;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.thumbnail:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+}
+
+.thumbnail img {
+  width: 100%;
+  height: 150px;
+  object-fit: cover;
+  display: block;
+  background-color: var(--surface-color);
+}
+
+.thumbnail .info {
+  padding: 1rem;
+}
+
+.thumbnail .filename {
+  font-size: 0.9rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.thumbnail .rename-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(0, 0, 0, 0.5);
+  border: none;
+  color: white;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.thumbnail:hover .rename-btn {
+  opacity: 1;
+}
+
+/* --- Rename Modal --- */
+#rename-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.7);
+  display: none; /* Initially hidden */
+  justify-content: center;
+  align-items: center;
+  backdrop-filter: blur(5px);
+  z-index: 1000;
+}
+#rename-modal.visible {
+  display: flex;
+}
+
+.modal-content {
+  background: var(--surface-color);
+  padding: 2rem;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 400px;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.4);
+}
+
+.modal-content h3 {
+  margin-bottom: 1.5rem;
+}
+.modal-content .input-group {
+  display: flex;
+  align-items: center;
+  background: var(--bg-color);
+  border-radius: 8px;
+  padding: 4px;
+  border: 1px solid var(--border-color);
+}
+.modal-content input {
+  flex-grow: 1;
+  background: transparent;
+  border: none;
+  color: var(--text-color);
+  padding: 12px;
+  font-size: 1rem;
+  outline: none;
+}
+.modal-content .extension {
+  padding-right: 12px;
+  color: var(--subtle-text-color);
+}
+.modal-actions {
+  margin-top: 1.5rem;
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+}
+.modal-button {
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+.cancel-btn {
+  background: var(--bg-color);
+  color: var(--text-color);
+  border-color: var(--border-color);
+}
+
+#toast-container {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.toast {
+  padding: 15px 20px;
+  border-radius: 8px;
+  color: white;
+  font-weight: 500;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  opacity: 0;
+  transform: translateX(100%);
+  animation: slideIn 0.5s forwards, fadeOut 0.5s 4.5s forwards;
+}
+
+.toast.success {
+  background-color: var(--success-color);
+}
+.toast.error {
+  background-color: var(--error-color);
+}
+.toast.info {
+  background-color: var(--primary-color);
+}
+
+@keyframes slideIn {
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes fadeOut {
+  to {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+}

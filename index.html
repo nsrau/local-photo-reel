@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Local Photo Reel</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <div>
+          <h1>Local Photo Reel</h1>
+          <p id="folder-name">No folder selected</p>
+        </div>
+        <button
+          id="btnChangeFolder"
+          class="action-button"
+          style="display: none"
+        >
+          Change Folder
+        </button>
+      </header>
+      <main>
+        <div id="welcome-screen">
+          <h2>Welcome to Photo Reel</h2>
+          <p>
+            Select a folder on your computer to view your photos, or create a
+            new demo album to get started.
+          </p>
+          <div id="welcome-actions">
+            <button id="btnSelectFolder" class="action-button secondary-button">
+              📂 Open Existing Folder
+            </button>
+            <button id="btnCreateDemo" class="action-button">
+              ✨ Create Demo Album
+            </button>
+          </div>
+        </div>
+        <div id="gallery"></div>
+      </main>
+    </div>
+
+    <div id="rename-modal">
+      <div class="modal-content">
+        <h3>Rename File</h3>
+        <div class="input-group">
+          <input type="text" id="rename-input" autocomplete="off" />
+          <span id="rename-extension" class="extension">.jpg</span>
+        </div>
+        <div class="modal-actions">
+          <button id="btn-cancel-rename" class="modal-button cancel-btn">
+            Cancel
+          </button>
+          <button id="btn-save-rename" class="modal-button action-button">
+            Save
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div id="toast-container"></div>
+
+    <script src="app.js" defer></script>
+  </body>
+</html>
