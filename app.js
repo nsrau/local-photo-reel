@@ -84,20 +84,44 @@ async function getDirectoryHandle() {
 
 // --- Core Application Functions ---
 
+// Updated verifyPermission function - only query, don't request automatically
+async function verifyPermission(handle, autoRequest = false) {
+  const options = { mode: "readwrite" };
+
+  // Always check current permission status first
+  const currentPermission = await handle.queryPermission(options);
+  if (currentPermission === "granted") {
+    return true;
+  }
+
+  // Only request permission if explicitly allowed and we have user activation
+  if (autoRequest) {
+    try {
+      const newPermission = await handle.requestPermission(options);
+      return newPermission === "granted";
+    } catch (error) {
+      console.warn("Permission request failed:", error);
+      return false;
+    }
+  }
+
+  return false;
+}
+
+// Updated init function - don't auto-request permissions
 async function init() {
   await openDb();
   directoryHandle = await getDirectoryHandle();
 
   if (directoryHandle) {
-    if (await verifyPermission(directoryHandle)) {
+    // Only query permission, don't request it
+    if (await verifyPermission(directoryHandle, false)) {
       console.log("Restored directory handle and permission is granted.");
       startApp();
     } else {
-      console.log(
-        "Permission for stored handle was revoked. Displaying welcome screen."
-      );
-      directoryHandle = null;
-      showWelcomeScreen();
+      console.log("Permission for stored handle needs to be re-granted.");
+      // Show a message that user needs to re-select folder
+      showPermissionNeededScreen();
     }
   } else {
     showWelcomeScreen();
@@ -113,6 +137,22 @@ function showWelcomeScreen() {
   btnChangeFolder.style.display = "none";
 }
 
+// New function to handle permission issues
+function showPermissionNeededScreen() {
+  gallery.innerHTML = `
+    <div style="text-align: center; padding: 2rem; color: var(--subtle-text-color);">
+      <p>Permission to access the previously selected folder has expired.</p>
+      <p>Please select the folder again to continue.</p>
+      <button onclick="selectExistingFolder()" style="margin-top: 1rem; padding: 0.5rem 1rem; background: var(--primary-color); color: white; border: none; border-radius: 4px; cursor: pointer;">
+        Select Folder Again
+      </button>
+    </div>
+  `;
+  folderNameEl.textContent = "Permission needed";
+  btnChangeFolder.style.display = "block";
+  welcomeScreen.style.display = "none";
+}
+
 function startApp() {
   if (!directoryHandle) return;
   welcomeScreen.style.display = "none";
@@ -122,12 +162,20 @@ function startApp() {
   startBackgroundPolling();
 }
 
+// Updated selectExistingFolder to ensure we have user activation
 async function selectExistingFolder() {
   try {
+    // This has user activation since it's triggered by button click
     const handle = await window.showDirectoryPicker();
     directoryHandle = handle;
-    await saveDirectoryHandle(handle);
-    startApp();
+
+    // Verify permission (should be granted since user just selected)
+    if (await verifyPermission(handle, true)) {
+      await saveDirectoryHandle(handle);
+      startApp();
+    } else {
+      showToast("Could not get permission to access folder.", "error");
+    }
   } catch (err) {
     if (err.name !== "AbortError") {
       console.error("Error selecting folder:", err);
@@ -311,62 +359,75 @@ async function saveRename() {
   }
 }
 
+// Updated worker code to handle permission errors gracefully
 function startBackgroundPolling() {
   if (worker) {
     worker.terminate();
   }
 
   const workerCode = `
-        let directoryHandle = null;
-        let knownFiles = new Set();
-        let intervalId = null;
+    let directoryHandle = null;
+    let knownFiles = new Set();
+    let intervalId = null;
 
-        async function scanDirectory() {
-            if (!directoryHandle) return;
-            const newFiles = new Set();
-            let hasChanges = false;
-            
-            try {
-                for await (const entry of directoryHandle.values()) {
-                    if (entry.kind === 'file' && entry.name.match(/\\.(jpg|jpeg|png|webp|gif)$/i)) {
-                        newFiles.add(entry.name);
-                    }
-                }
+    async function scanDirectory() {
+        if (!directoryHandle) return;
+        const newFiles = new Set();
+        let hasChanges = false;
+        
+        try {
+            // Only query permission, don't request it
+            const permission = await directoryHandle.queryPermission({ mode: 'readwrite' });
+            if (permission !== 'granted') {
+                self.postMessage({ type: 'permission-lost' });
+                clearInterval(intervalId);
+                return;
+            }
 
-                if (newFiles.size !== knownFiles.size) {
-                    hasChanges = true;
-                } else {
-                    for(const file of knownFiles) {
-                       if(!newFiles.has(file)) {
-                           hasChanges = true;
-                           break;
-                       }
-                    }
+            for await (const entry of directoryHandle.values()) {
+                if (entry.kind === 'file' && entry.name.match(/\\.(jpg|jpeg|png|webp|gif)$/i)) {
+                    newFiles.add(entry.name);
                 }
+            }
 
-                if (hasChanges) {
-                    self.postMessage({ type: 'changes-detected' });
-                    knownFiles = newFiles;
+            if (newFiles.size !== knownFiles.size) {
+                hasChanges = true;
+            } else {
+                for(const file of knownFiles) {
+                   if(!newFiles.has(file)) {
+                       hasChanges = true;
+                       break;
+                   }
                 }
-            } catch(e) {
-               console.error("Worker error scanning directory:", e);
-               self.postMessage({ type: 'permission-error' });
+            }
+
+            if (hasChanges) {
+                self.postMessage({ type: 'changes-detected' });
+                knownFiles = newFiles;
+            }
+        } catch(e) {
+           console.error("Worker error scanning directory:", e);
+           // Don't assume it's a permission error - could be network/file system issue
+           if (e.name === 'NotAllowedError') {
+               self.postMessage({ type: 'permission-lost' });
                clearInterval(intervalId);
-            }
+           }
         }
+    }
 
-        self.onmessage = (e) => {
-            if (e.data.type === 'start') {
-                directoryHandle = e.data.handle;
-                knownFiles = new Set(e.data.initialFiles);
-                if (intervalId) clearInterval(intervalId);
-                intervalId = setInterval(scanDirectory, 3000);
-            } else if (e.data.type === 'stop') {
-                if(intervalId) clearInterval(intervalId);
-                intervalId = null;
-            }
-        };
-    `;
+    self.onmessage = (e) => {
+        if (e.data.type === 'start') {
+            directoryHandle = e.data.handle;
+            knownFiles = new Set(e.data.initialFiles);
+            if (intervalId) clearInterval(intervalId);
+            intervalId = setInterval(scanDirectory, 3000);
+        } else if (e.data.type === 'stop') {
+            if(intervalId) clearInterval(intervalId);
+            intervalId = null;
+        }
+    };
+  `;
+
   const workerBlob = new Blob([workerCode], { type: "application/javascript" });
   worker = new Worker(URL.createObjectURL(workerBlob));
 
@@ -375,40 +436,38 @@ function startBackgroundPolling() {
     if (e.data.type === "changes-detected") {
       showToast("New photos detected! Refreshing gallery.", "info");
       renderGallery();
-    } else if (e.data.type === "permission-error") {
-      showToast("Lost permission to access the folder.", "error");
+    } else if (e.data.type === "permission-lost") {
+      showToast(
+        "Permission to access folder was lost. Please select folder again.",
+        "error"
+      );
       directoryHandle = null;
-      showWelcomeScreen();
+      showPermissionNeededScreen();
     }
   };
 
+  // Initialize worker with current files
   (async () => {
     const initialFiles = [];
-    for await (const entry of directoryHandle.values()) {
-      if (
-        entry.kind === "file" &&
-        entry.name.match(/\\.(jpg|jpeg|png|webp|gif)$/i)
-      ) {
-        initialFiles.push(entry.name);
+    try {
+      for await (const entry of directoryHandle.values()) {
+        if (
+          entry.kind === "file" &&
+          entry.name.match(/\\.(jpg|jpeg|png|webp|gif)$/i)
+        ) {
+          initialFiles.push(entry.name);
+        }
       }
+      worker.postMessage({
+        type: "start",
+        handle: directoryHandle,
+        initialFiles: initialFiles,
+      });
+    } catch (error) {
+      console.error("Error initializing worker:", error);
+      showToast("Could not start background monitoring.", "error");
     }
-    worker.postMessage({
-      type: "start",
-      handle: directoryHandle,
-      initialFiles: initialFiles,
-    });
   })();
-}
-
-async function verifyPermission(handle) {
-  const options = { mode: "readwrite" };
-  if ((await handle.queryPermission(options)) === "granted") {
-    return true;
-  }
-  if ((await handle.requestPermission(options)) === "granted") {
-    return true;
-  }
-  return false;
 }
 
 // Event Listeners
@@ -426,4 +485,5 @@ renameModal.addEventListener("keydown", (e) => {
   }
 });
 
+// Initialize the app
 init();
